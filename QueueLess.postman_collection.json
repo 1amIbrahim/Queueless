@@ -1,0 +1,363 @@
+{
+  "info": {
+    "name": "QueueLess API",
+    "_postman_id": "queueless-api-collection-v1",
+    "description": "Full API collection for QueueLess — Hospital Queue Management System.\n\n**Setup:**\n1. Set the `baseUrl` variable to `http://localhost:4000`\n2. Set `authToken` to a Supabase JWT (or leave blank if you added the temp auth bypass)\n3. Run requests in order — Hospitals → Queues → Tokens",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",     "value": "http://localhost:4000", "type": "string" },
+    { "key": "authToken",   "value": "",                      "type": "string", "description": "Supabase JWT — leave blank if using temp auth bypass" },
+    { "key": "hospital_id", "value": "a0000000-0000-0000-0000-000000000002", "type": "string", "description": "Mayo Hospital (seeded)" },
+    { "key": "queue_id",    "value": "e0000000-0000-0000-0000-000000000003", "type": "string", "description": "Mayo Hospital — Dr. Fatima Malik (seeded)" },
+    { "key": "token_id",    "value": "",                      "type": "string", "description": "Populated after POST /tokens" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Verify the API is running. No auth required."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Hospitals",
+      "item": [
+        {
+          "name": "Get Nearby Hospitals (General — sorted by wait time)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/hospitals/nearby?lat=31.52&lng=74.36&radius_km=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["hospitals", "nearby"],
+              "query": [
+                { "key": "lat",       "value": "31.52",  "description": "Lahore city centre latitude" },
+                { "key": "lng",       "value": "74.36",  "description": "Lahore city centre longitude" },
+                { "key": "radius_km", "value": "20",     "description": "Search radius in km" }
+              ]
+            },
+            "description": "Returns all hospitals within radius sorted by shortest wait time. This powers the Comparison Screen."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Nearby Hospitals (Filter by Specialty — Cardiology)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/hospitals/nearby?lat=31.52&lng=74.36&radius_km=20&specialty=cardiology",
+              "host": ["{{baseUrl}}"],
+              "path": ["hospitals", "nearby"],
+              "query": [
+                { "key": "lat",       "value": "31.52" },
+                { "key": "lng",       "value": "74.36" },
+                { "key": "radius_km", "value": "20" },
+                { "key": "specialty", "value": "cardiology", "description": "Filter by specialty tab" }
+              ]
+            },
+            "description": "Powers the By Specialty tab on the comparison screen."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Hospital Queues (all doctors + live counts)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/hospitals/{{hospital_id}}/queues",
+              "host": ["{{baseUrl}}"],
+              "path": ["hospitals", "{{hospital_id}}", "queues"]
+            },
+            "description": "Returns all of today's queues for a hospital, each with live token count and estimated wait. Used on Hospital Detail screen."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Queues",
+      "item": [
+        {
+          "name": "Get Queue (full state + waiting tokens)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/queues/{{queue_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["queues", "{{queue_id}}"]
+            },
+            "description": "Returns full queue state plus all waiting/called tokens in order. Used by the Receptionist and Doctor screens."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Queue for Today",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"c0000000-0000-0000-0000-000000000001\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/queues",
+              "host": ["{{baseUrl}}"],
+              "path": ["queues"]
+            },
+            "description": "Creates a new open queue for a doctor for today. Returns 409 if queue already exists (safe to retry)."
+          },
+          "response": []
+        },
+        {
+          "name": "Pause Queue",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"paused\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/queues/{{queue_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["queues", "{{queue_id}}"]
+            },
+            "description": "Set status to paused, open, or closed. Also accepts avg_minutes_per_patient."
+          },
+          "response": []
+        },
+        {
+          "name": "Resume Queue",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"open\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/queues/{{queue_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["queues", "{{queue_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Avg Time Per Patient",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"avg_minutes_per_patient\": 12\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/queues/{{queue_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["queues", "{{queue_id}}"]
+            },
+            "description": "Adjusting this recalculates all ETAs across the queue instantly."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tokens",
+      "item": [
+        {
+          "name": "Issue Walk-in Token (Receptionist)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.token && json.token.id) {",
+                  "  pm.collectionVariables.set('token_id', json.token.id);",
+                  "  console.log('token_id saved:', json.token.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"queue_id\": \"{{queue_id}}\",\n  \"patient_name\": \"Test Walk-in Patient\",\n  \"patient_phone\": \"+923001234999\",\n  \"type\": \"walkin\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tokens",
+              "host": ["{{baseUrl}}"],
+              "path": ["tokens"]
+            },
+            "description": "Issues a new walk-in token. Automatically saves the returned token_id to the collection variable so subsequent requests can use it."
+          },
+          "response": []
+        },
+        {
+          "name": "Issue App Booking Token (Patient)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.token && json.token.id) {",
+                  "  pm.collectionVariables.set('token_id', json.token.id);",
+                  "  console.log('token_id saved:', json.token.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"queue_id\": \"{{queue_id}}\",\n  \"patient_phone\": \"+923009876543\",\n  \"type\": \"app\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tokens",
+              "host": ["{{baseUrl}}"],
+              "path": ["tokens"]
+            },
+            "description": "App booking — patient_id would normally come from the JWT. patient_name/phone optional if logged in."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Token Position (live queue position + ETA)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tokens/{{token_id}}/position",
+              "host": ["{{baseUrl}}"],
+              "path": ["tokens", "{{token_id}}", "position"]
+            },
+            "description": "Returns the token's current position in queue and estimated wait in minutes. This is what the patient's My Token screen polls (or subscribes to via Realtime)."
+          },
+          "response": []
+        },
+        {
+          "name": "Call Next Patient (Doctor advances queue)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"queue_id\": \"{{queue_id}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tokens/call-next",
+              "host": ["{{baseUrl}}"],
+              "path": ["tokens", "call-next"]
+            },
+            "description": "The Doctor's 'Next Patient' button. Marks current called token as completed, calls the next waiting token, and returns remaining count. Run this multiple times to drain the queue."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Token",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tokens/{{token_id}}/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["tokens", "{{token_id}}", "cancel"]
+            },
+            "description": "Patient cancels their own token, or receptionist/admin cancels any token."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Send Notification (SMS + WhatsApp)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token_id\": \"{{token_id}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/send",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "send"]
+            },
+            "description": "Manually trigger a notification for a token. In production this is called automatically when a patient reaches position 3. Without Twilio credentials it logs to the API console instead of sending."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
