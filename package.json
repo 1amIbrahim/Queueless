@@ -1,0 +1,19 @@
+{
+  "name": "queueless",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "mobile": "npm run start --workspace=apps/mobile",
+    "web": "npm run dev --workspace=apps/web",
+    "api": "npm run dev --workspace=packages/api",
+    "dev": "concurrently \"npm run web\" \"npm run api\"",
+    "build": "npm run build --workspace=apps/web && npm run build --workspace=packages/api"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
