@@ -18,6 +18,7 @@ export default function TokenGenerator() {
   const [patientName, setPatientName] = useState('')
   const [patientPhone, setPatientPhone] = useState('')
   const [loading, setLoading] = useState(false)
+  const [hospitalError, setHospitalError] = useState<string | null>(null)
   const [loadingQueues, setLoadingQueues] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [receipt, setReceipt] = useState<any>(null)
@@ -26,7 +27,12 @@ export default function TokenGenerator() {
   useEffect(() => {
     apiGet<{ hospitals: Hospital[] }>(
       `/hospitals/nearby?lat=${LAHORE.lat}&lng=${LAHORE.lng}&radius_km=50`
-    ).then(d => setHospitals(d.hospitals)).catch(() => {})
+    )
+      .then(d => setHospitals(d.hospitals))
+      .catch(e => {
+        console.error('Failed to load hospitals:', e)
+        setHospitalError(`Could not load hospitals: ${e.message}. Is the API running on ${import.meta.env.VITE_API_URL ?? 'http://localhost:4000'}?`)
+      })
   }, [])
 
   // Fetch queues when hospital changes
@@ -94,6 +100,11 @@ export default function TokenGenerator() {
 
       <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
         {/* Hospital selector */}
+        {hospitalError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
+            {hospitalError}
+          </div>
+        )}
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5">Hospital</label>
           <select

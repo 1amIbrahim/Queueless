@@ -1,11 +1,15 @@
 import { supabase } from './supabase'
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
+const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 async function headers(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession()
   const h: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (session?.access_token) h['Authorization'] = `Bearer ${session.access_token}`
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token) h['Authorization'] = `Bearer ${session.access_token}`
+  } catch (e) {
+    console.warn('Could not get Supabase session:', e)
+  }
   return h
 }
 
