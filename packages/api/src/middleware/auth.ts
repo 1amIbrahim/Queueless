@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 export interface AuthRequest extends Request {
   userId?: string
   userRole?: string
+  accessToken?: string
 }
 
 export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
@@ -21,6 +22,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
 
   req.userId = data.user.id
   req.userRole = data.user.user_metadata?.role ?? 'patient'
+  req.accessToken = token
   next()
 }
 
