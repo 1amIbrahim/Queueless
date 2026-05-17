@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { supabase } from '../lib/supabase'
+import { supabase, userSupabase } from '../lib/supabase'
 import { requireAuth, requireRole, AuthRequest } from '../middleware/auth'
 import { IssueTokenResponse, CallNextPatientResponse } from '@queueless/shared'
 
@@ -24,8 +24,11 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
 
   const { queue_id, patient_id, patient_name, patient_phone, type } = parsed.data
 
+  // Use user-scoped client so auth.role() = 'authenticated' satisfies RLS
+  const db = userSupabase(req.accessToken!)
+
   // Get current highest token number for this queue
-  const { data: lastToken } = await supabase
+  const { data: lastToken } = await db
     .from('tokens')
     .select('number')
     .eq('queue_id', queue_id)
@@ -35,7 +38,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
 
   const nextNumber = (lastToken?.number ?? 0) + 1
 
-  const { data: token, error } = await supabase
+  const { data: token, error } = await db
     .from('tokens')
     .insert({
       queue_id,
@@ -54,7 +57,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
     return
   }
 
-  // Compute position and wait time
+  // Reads can use base client (public data)
   const { count: position } = await supabase
     .from('tokens')
     .select('id', { count: 'exact', head: true })
@@ -68,20 +71,20 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
     .eq('id', queue_id)
     .single()
 
-  const estimatedWait = (position ?? 1) * (queue?.avg_minutes_per_patient ?? 10)
-
   const response: IssueTokenResponse = {
     token,
     position: position ?? 1,
-    estimated_wait_minutes: estimatedWait,
+    estimated_wait_minutes: (position ?? 1) * (queue?.avg_minutes_per_patient ?? 10),
   }
 
   res.status(201).json(response)
 })
 
 // GET /tokens/:id/position — live position for a patient's token
-router.get('/:id/position', requireAuth, async (req, res) => {
-  const { data: token, error } = await supabase
+router.get('/:id/position', requireAuth, async (req: AuthRequest, res) => {
+  const db = userSupabase(req.accessToken!)
+
+  const { data: token, error } = await db
     .from('tokens')
     .select('*')
     .eq('id', req.params.id)
@@ -121,7 +124,9 @@ router.get('/:id/position', requireAuth, async (req, res) => {
 
 // PATCH /tokens/:id/cancel
 router.patch('/:id/cancel', requireAuth, async (req: AuthRequest, res) => {
-  const { data: token } = await supabase
+  const db = userSupabase(req.accessToken!)
+
+  const { data: token } = await db
     .from('tokens')
     .select('patient_id')
     .eq('id', req.params.id)
@@ -132,13 +137,12 @@ router.patch('/:id/cancel', requireAuth, async (req: AuthRequest, res) => {
     return
   }
 
-  // Patients can only cancel their own token; receptionists/admins can cancel any
   if (req.userRole === 'patient' && token.patient_id !== req.userId) {
-    res.status(403).json({ error: 'Cannot cancel another patient\'s token' })
+    res.status(403).json({ error: "Cannot cancel another patient's token" })
     return
   }
 
-  const { error } = await supabase
+  const { error } = await db
     .from('tokens')
     .update({ status: 'cancelled' })
     .eq('id', req.params.id)
@@ -154,21 +158,20 @@ router.patch('/:id/cancel', requireAuth, async (req: AuthRequest, res) => {
 // POST /tokens/call-next — doctor calls next patient (advances queue)
 router.post('/call-next', requireAuth, requireRole('doctor', 'receptionist', 'admin'), async (req: AuthRequest, res) => {
   const { queue_id } = req.body
-
   if (!queue_id) {
     res.status(400).json({ error: 'queue_id is required' })
     return
   }
 
-  // Mark current "called" token as completed
-  await supabase
+  const db = userSupabase(req.accessToken!)
+
+  await db
     .from('tokens')
     .update({ status: 'completed', completed_at: new Date().toISOString() })
     .eq('queue_id', queue_id)
     .eq('status', 'called')
 
-  // Find the next waiting token
-  const { data: nextToken } = await supabase
+  const { data: nextToken } = await db
     .from('tokens')
     .select('*')
     .eq('queue_id', queue_id)
@@ -182,8 +185,7 @@ router.post('/call-next', requireAuth, requireRole('doctor', 'receptionist', 'ad
     return
   }
 
-  // Mark it as called
-  const { data: calledToken, error } = await supabase
+  const { data: calledToken, error } = await db
     .from('tokens')
     .update({ status: 'called', called_at: new Date().toISOString() })
     .eq('id', nextToken.id)
@@ -195,14 +197,12 @@ router.post('/call-next', requireAuth, requireRole('doctor', 'receptionist', 'ad
     return
   }
 
-  // Update queue's current_number
-  await supabase
+  await db
     .from('queues')
     .update({ last_called_number: calledToken.number })
     .eq('id', queue_id)
 
-  // Peek at next waiting token
-  const { data: afterNext } = await supabase
+  const { data: afterNext } = await db
     .from('tokens')
     .select('*')
     .eq('queue_id', queue_id)
