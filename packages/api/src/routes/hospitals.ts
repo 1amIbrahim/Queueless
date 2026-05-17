@@ -86,6 +86,27 @@ router.get('/nearby', async (req, res) => {
 router.get('/:id/queues', async (req, res) => {
   const today = new Date().toISOString().split('T')[0]
 
+  // Fetch doctor IDs belonging to this hospital first, then query queues by doctor_id.
+  // This avoids the PostgREST limitation where filtering on a joined table sets the
+  // join result to null instead of excluding the row.
+  const { data: hospitalDoctors, error: docError } = await supabase
+    .from('doctors')
+    .select('id')
+    .eq('hospital_id', req.params.id)
+    .eq('is_active', true)
+
+  if (docError) {
+    res.status(500).json({ error: docError.message })
+    return
+  }
+
+  const doctorIds = (hospitalDoctors ?? []).map((d: any) => d.id)
+
+  if (doctorIds.length === 0) {
+    res.json({ queues: [] })
+    return
+  }
+
   const { data: queues, error } = await supabase
     .from('queues')
     .select(`
@@ -96,28 +117,30 @@ router.get('/:id/queues', async (req, res) => {
       )
     `)
     .eq('date', today)
-    .eq('doctors.hospital_id', req.params.id)
+    .in('doctor_id', doctorIds)
 
   if (error) {
     res.status(500).json({ error: error.message })
     return
   }
 
-  // Attach live token counts
+  // Attach live token counts, skip any queue whose doctor join is null
   const enriched = await Promise.all(
-    (queues ?? []).map(async (q) => {
-      const { count } = await supabase
-        .from('tokens')
-        .select('id', { count: 'exact', head: true })
-        .eq('queue_id', q.id)
-        .eq('status', 'waiting')
+    (queues ?? [])
+      .filter((q: any) => q.doctors !== null)
+      .map(async (q: any) => {
+        const { count } = await supabase
+          .from('tokens')
+          .select('id', { count: 'exact', head: true })
+          .eq('queue_id', q.id)
+          .eq('status', 'waiting')
 
-      return {
-        ...q,
-        queue_length: count ?? 0,
-        estimated_wait_minutes: (count ?? 0) * (q.avg_minutes_per_patient ?? 10),
-      }
-    })
+        return {
+          ...q,
+          queue_length: count ?? 0,
+          estimated_wait_minutes: (count ?? 0) * (q.avg_minutes_per_patient ?? 10),
+        }
+      })
   )
 
   res.json({ queues: enriched })
