@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 
 interface AuthState {
   session: Session | null
+  userRole: string
   initialized: boolean
   loading: boolean
   error: string | null
@@ -14,26 +15,39 @@ interface AuthState {
   clearError: () => void
 }
 
+async function fetchRole(userId: string): Promise<string> {
+  const { data } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', userId)
+    .single()
+  return data?.role ?? 'patient'
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   session: null,
+  userRole: 'patient',
   initialized: false,
   loading: false,
   error: null,
 
   init: async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    set({ session, initialized: true })
+    const role = session?.user ? await fetchRole(session.user.id) : 'patient'
+    set({ session, userRole: role, initialized: true })
 
-    supabase.auth.onAuthStateChange((_event, session) => {
-      set({ session })
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+      const role = session?.user ? await fetchRole(session.user.id) : 'patient'
+      set({ session, userRole: role })
     })
   },
 
   signIn: async (email, password) => {
     set({ loading: true, error: null })
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) set({ error: error.message })
-    set({ loading: false })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) { set({ error: error.message, loading: false }); return }
+    const role = data.user ? await fetchRole(data.user.id) : 'patient'
+    set({ userRole: role, loading: false })
   },
 
   signUp: async (email, password, name, phone) => {
@@ -43,17 +57,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       password,
       options: { data: { name, phone, role: 'patient' } },
     })
-    if (error) {
-      set({ error: error.message, loading: false })
-      return
-    }
-    // Insert into public.users
+    if (error) { set({ error: error.message, loading: false }); return }
     if (data.user) {
       await supabase.from('users').insert({
-        id: data.user.id,
-        role: 'patient',
-        name,
-        phone,
+        id: data.user.id, role: 'patient', name, phone,
       })
     }
     set({ loading: false })
@@ -61,7 +68,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   signOut: async () => {
     await supabase.auth.signOut()
-    set({ session: null })
+    set({ session: null, userRole: 'patient' })
   },
 
   clearError: () => set({ error: null }),

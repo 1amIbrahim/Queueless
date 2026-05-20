@@ -5,6 +5,9 @@ import Login from './pages/Login'
 import TokenGenerator from './pages/TokenGenerator'
 import QueueMonitor from './pages/QueueMonitor'
 import QueueManagement from './pages/QueueManagement'
+import AdminOverview from './pages/admin/Overview'
+import AdminDoctors from './pages/admin/Doctors'
+import AdminAnalytics from './pages/admin/Analytics'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -32,9 +35,15 @@ export default function App() {
           </ProtectedRoute>
         }>
           <Route index element={<Navigate to="/issue" replace />} />
-          <Route path="issue" element={<TokenGenerator />} />
+          {/* Receptionist */}
+          <Route path="issue"   element={<TokenGenerator />} />
           <Route path="monitor" element={<QueueMonitor />} />
-          <Route path="manage" element={<QueueManagement />} />
+          <Route path="manage"  element={<QueueManagement />} />
+          {/* Admin */}
+          <Route path="admin"           element={<Navigate to="/admin/overview" replace />} />
+          <Route path="admin/overview"  element={<AdminOverview />} />
+          <Route path="admin/doctors"   element={<AdminDoctors />} />
+          <Route path="admin/analytics" element={<AdminAnalytics />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

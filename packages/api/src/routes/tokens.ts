@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { supabase, userSupabase } from '../lib/supabase'
 import { requireAuth, requireRole, AuthRequest } from '../middleware/auth'
 import { IssueTokenResponse, CallNextPatientResponse } from '@queueless/shared'
+import { notifyApproachingPatients } from '../lib/notify'
 
 const router = Router()
 
@@ -224,6 +225,9 @@ router.post('/call-next', requireAuth, requireRole('doctor', 'receptionist', 'ad
   }
 
   res.json(response)
+
+  // Fire-and-forget: notify patients now at positions 1-3 after queue advances
+  notifyApproachingPatients(queue_id).catch(() => {})
 })
 
 export default router
