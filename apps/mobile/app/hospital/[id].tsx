@@ -38,6 +38,9 @@ export default function HospitalDetailScreen() {
   const [queues, setQueues] = useState<QueueItem[]>([])
   const [loading, setLoading] = useState(true)
   const [joiningQueueId, setJoiningQueueId] = useState<string | null>(null)
+  const fastestWait = queues.length
+    ? Math.min(...queues.map(q => q.estimated_wait_minutes || 999))
+    : null
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -147,9 +150,56 @@ export default function HospitalDetailScreen() {
           )
         }}
         ListHeaderComponent={
-          <Text style={styles.sectionLabel}>
-            {queues.length} doctor{queues.length !== 1 ? 's' : ''} available today
-          </Text>
+          <View style={styles.listHeader}>
+            <View style={[styles.heroCard, shadow.card]}>
+              <View style={styles.heroTopRow}>
+                <View>
+                  <Text style={styles.heroTitle}>Hospital Overview</Text>
+                  <Text style={styles.heroSubtitle} numberOfLines={2}>
+                    {hospital?.address ?? 'Address unavailable'}
+                  </Text>
+                </View>
+                <View style={styles.heroBadge}>
+                  <Ionicons name="time" size={14} color={colors.primary} />
+                  <Text style={styles.heroBadgeText}>Live</Text>
+                </View>
+              </View>
+              <View style={styles.heroStats}>
+                <View style={styles.heroStatBlock}>
+                  <Text style={styles.heroStatValue}>{queues.length}</Text>
+                  <Text style={styles.heroStatLabel}>Doctors</Text>
+                </View>
+                <View style={styles.heroStatBlock}>
+                  <Text style={styles.heroStatValue}>
+                    {fastestWait === null || fastestWait === 999 ? '—' : `${fastestWait}m`}
+                  </Text>
+                  <Text style={styles.heroStatLabel}>Fastest</Text>
+                </View>
+                <View style={styles.heroStatBlock}>
+                  <Text style={styles.heroStatValue}>{queues.filter(q => q.status === 'open').length}</Text>
+                  <Text style={styles.heroStatLabel}>Open Queues</Text>
+                </View>
+              </View>
+              <View style={styles.heroActions}>
+                <TouchableOpacity style={styles.heroAction} onPress={callHospital}>
+                  <Ionicons name="call" size={16} color={colors.white} />
+                  <Text style={styles.heroActionText}>Call</Text>
+                </TouchableOpacity>
+                {hospital?.lat && hospital?.lng ? (
+                  <TouchableOpacity
+                    style={[styles.heroAction, styles.heroActionGhost]}
+                    onPress={() => Linking.openURL(`https://maps.google.com/?q=${hospital.lat},${hospital.lng}`)}
+                  >
+                    <Ionicons name="navigate" size={16} color={colors.primary} />
+                    <Text style={[styles.heroActionText, styles.heroActionGhostText]}>Directions</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+            <Text style={styles.sectionLabel}>
+              {queues.length} doctor{queues.length !== 1 ? 's' : ''} available today
+            </Text>
+          </View>
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
@@ -193,11 +243,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   list: { backgroundColor: colors.background, paddingTop: spacing.sm, paddingBottom: 24, flexGrow: 1 },
+  listHeader: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  heroCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  heroTitle: { fontSize: font.base, fontWeight: '700', color: colors.text },
+  heroSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2, maxWidth: 220 },
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.primaryLight,
+  },
+  heroBadgeText: { fontSize: 11, fontWeight: '700', color: colors.primary },
+  heroStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+  },
+  heroStatBlock: { alignItems: 'center', flex: 1 },
+  heroStatValue: { fontSize: font.lg, fontWeight: '700', color: colors.text },
+  heroStatLabel: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  heroActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  heroAction: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+  },
+  heroActionText: { color: colors.white, fontWeight: '700', fontSize: 12 },
+  heroActionGhost: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+  heroActionGhostText: { color: colors.primary },
   sectionLabel: {
     fontSize: 12,
     color: colors.textSecondary,
     fontWeight: '500',
-    paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
   },
   loadingState: { flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },

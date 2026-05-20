@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { Link } from 'expo-router'
 import { useAuthStore } from '../../store/authStore'
-import { colors, spacing, radius, font } from '../../constants/theme'
+import { colors, spacing, radius, font, shadow } from '../../constants/theme'
 
 export default function LoginScreen() {
   const { signIn, loading, error, clearError } = useAuthStore()
@@ -23,15 +23,21 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <View style={styles.bgDecor}>
+        <View style={styles.orbOne} />
+        <View style={styles.orbTwo} />
+      </View>
+
       {/* Header */}
       <View style={styles.header}>
+        <Text style={styles.kicker}>WELCOME BACK</Text>
         <Text style={styles.logo}>QueueLess</Text>
-        <Text style={styles.tagline}>Every token. Every hospital. One screen.</Text>
+        <Text style={styles.tagline}>Your live queue pass, always in sync.</Text>
       </View>
 
       {/* Form */}
-      <View style={styles.form}>
-        <Text style={styles.title}>Welcome back</Text>
+      <View style={[styles.form, shadow.card]}>
+        <Text style={styles.title}>Sign in to continue</Text>
 
         {error ? (
           <View style={styles.errorBox}>
@@ -88,15 +94,34 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.primary },
-  header: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
+  container: { flex: 1, backgroundColor: colors.primary, justifyContent: 'flex-end' },
+  bgDecor: { ...StyleSheet.absoluteFillObject },
+  orbOne: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    top: -60,
+    right: -40,
   },
-  logo: { fontSize: 36, fontWeight: '800', color: colors.white, letterSpacing: -1 },
-  tagline: { fontSize: font.sm, color: 'rgba(255,255,255,0.75)', marginTop: spacing.xs, textAlign: 'center' },
+  orbTwo: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    bottom: 140,
+    left: -50,
+  },
+  header: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    paddingTop: 60,
+  },
+  kicker: { fontSize: 12, letterSpacing: 2, color: 'rgba(255,255,255,0.7)', fontWeight: '700' },
+  logo: { fontSize: 38, fontWeight: '800', color: colors.white, letterSpacing: -1, marginTop: 8 },
+  tagline: { fontSize: font.sm, color: 'rgba(255,255,255,0.8)', marginTop: spacing.xs, maxWidth: 260 },
   form: {
     backgroundColor: colors.white,
     borderTopLeftRadius: 28,
@@ -109,17 +134,17 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    paddingVertical: 13,
+    paddingVertical: 14,
     fontSize: font.base,
     color: colors.text,
     backgroundColor: colors.background,
   },
   button: {
     backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingVertical: 15,
+    borderRadius: radius.md,
+    paddingVertical: 16,
     alignItems: 'center',
     marginTop: spacing.lg,
   },

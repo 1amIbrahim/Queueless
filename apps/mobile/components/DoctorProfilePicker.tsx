@@ -4,19 +4,18 @@ import {
   SafeAreaView, ActivityIndicator, ScrollView,
 } from 'react-native'
 import { apiGet } from '../lib/api'
+import { supabase } from '../lib/supabase'
 import { useDoctorStore } from '../store/doctorStore'
+import { useAuthStore } from '../store/authStore'
 import { colors, spacing, radius, font, shadow } from '../constants/theme'
 
 const LAHORE = { lat: 31.52, lng: 74.36 }
 
 interface Hospital { id: string; name: string }
-interface QueueItem {
-  id: string
-  doctors: { id: string; name: string; specialty: string }
-}
 
 export default function DoctorProfilePicker() {
   const { saveProfile } = useDoctorStore()
+  const { userRole, hospitalId } = useAuthStore()
   const [hospitals, setHospitals] = useState<Hospital[]>([])
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null)
   const [doctors, setDoctors] = useState<{ id: string; name: string; specialty: string }[]>([])
@@ -27,16 +26,28 @@ export default function DoctorProfilePicker() {
     apiGet<{ hospitals: Hospital[] }>(
       `/hospitals/nearby?lat=${LAHORE.lat}&lng=${LAHORE.lng}&radius_km=50`
     )
-      .then(d => setHospitals(d.hospitals))
+      .then(d => {
+        if (userRole === 'doctor' && hospitalId) {
+          const own = d.hospitals.find(h => h.id === hospitalId)
+          setHospitals(own ? [own] : [])
+          if (own) selectHospital(own)
+        } else {
+          setHospitals(d.hospitals)
+        }
+      })
       .finally(() => setLoading(false))
-  }, [])
+  }, [hospitalId, userRole])
 
   const selectHospital = async (h: Hospital) => {
     setSelectedHospital(h)
     setLoadingDoctors(true)
     try {
-      const data = await apiGet<{ queues: QueueItem[] }>(`/hospitals/${h.id}/queues`)
-      setDoctors(data.queues.filter(q => q.doctors).map(q => q.doctors))
+      const { data } = await supabase
+        .from('doctors')
+        .select('id, name, specialty')
+        .eq('hospital_id', h.id)
+        .eq('is_active', true)
+      setDoctors((data as any[]) ?? [])
     } catch {}
     finally { setLoadingDoctors(false) }
   }
@@ -75,14 +86,16 @@ export default function DoctorProfilePicker() {
           </>
         ) : (
           <>
-            <TouchableOpacity style={styles.backRow} onPress={() => setSelectedHospital(null)}>
-              <Text style={styles.backText}>← {selectedHospital.name}</Text>
-            </TouchableOpacity>
+            {userRole !== 'doctor' && (
+              <TouchableOpacity style={styles.backRow} onPress={() => setSelectedHospital(null)}>
+                <Text style={styles.backText}>← {selectedHospital.name}</Text>
+              </TouchableOpacity>
+            )}
             <Text style={styles.sectionLabel}>Select Your Name</Text>
             {loadingDoctors ? (
               <ActivityIndicator color={colors.teal} />
             ) : doctors.length === 0 ? (
-              <Text style={styles.empty}>No doctors with open queues today at this hospital.</Text>
+              <Text style={styles.empty}>No active doctor profiles found for this hospital.</Text>
             ) : (
               doctors.map(d => (
                 <TouchableOpacity key={d.id} style={styles.card} onPress={() => selectDoctor(d)}>

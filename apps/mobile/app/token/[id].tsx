@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  SafeAreaView, ActivityIndicator, Alert,
+  SafeAreaView, ActivityIndicator, Alert, Animated, Easing,
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -47,6 +47,8 @@ export default function MyTokenScreen() {
   const [data, setData] = useState<PositionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [cancelling, setCancelling] = useState(false)
+  const pulse = useRef(new Animated.Value(0)).current
+  const calledScale = useRef(new Animated.Value(1)).current
 
   const fetchPosition = useCallback(async () => {
     try {
@@ -75,6 +77,27 @@ export default function MyTokenScreen() {
     return () => { supabase.removeChannel(channel) }
   }, [fetchPosition, id])
 
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1200,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1200,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [pulse])
+
   const cancelToken = () => {
     Alert.alert(
       'Cancel token?',
@@ -100,6 +123,46 @@ export default function MyTokenScreen() {
     )
   }
 
+  const tokenStatus = data?.token.status ?? 'waiting'
+  const positionValue = data?.position ?? 0
+  const estimatedWaitValue = data?.estimated_wait_minutes ?? 0
+  const status = statusLabel(tokenStatus)
+  const isActive = tokenStatus === 'waiting' || tokenStatus === 'called'
+  const isCalled = tokenStatus === 'called'
+
+  useEffect(() => {
+    if (!isCalled) {
+      calledScale.setValue(1)
+      return
+    }
+    Animated.sequence([
+      Animated.timing(calledScale, {
+        toValue: 1.04,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(calledScale, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }, [calledScale, isCalled])
+
+  const pulseScale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.35],
+  })
+  const pulseOpacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.55, 0],
+  })
+  const progressWidth = useMemo(() => {
+    if (tokenStatus !== 'waiting' || positionValue <= 0) return '0%'
+    const ratio = Math.max(8, 100 - positionValue * 8)
+    return `${ratio}%`
+  }, [positionValue, tokenStatus])
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -124,9 +187,6 @@ export default function MyTokenScreen() {
   }
 
   const { token, position, estimated_wait_minutes } = data
-  const status = statusLabel(token.status)
-  const isActive = token.status === 'waiting' || token.status === 'called'
-  const isCalled = token.status === 'called'
 
   return (
     <SafeAreaView style={[styles.safe, isCalled && styles.safeGreen]}>
@@ -135,21 +195,58 @@ export default function MyTokenScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Token</Text>
+        <Text style={styles.headerTitle}>Boarding Pass</Text>
         <View style={{ width: 36 }} />
       </View>
 
       <View style={styles.body}>
-        {/* Token Number Card */}
-        <View style={[styles.tokenCard, isCalled && styles.tokenCardGreen, shadow.card]}>
-          <Text style={styles.tokenLabel}>Token Number</Text>
-          <Text style={[styles.tokenNumber, isCalled && styles.tokenNumberGreen]}>
-            #{token.number}
-          </Text>
-          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-            <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
+        {/* Ticket */}
+        <Animated.View
+          style={[
+            styles.ticket,
+            isCalled && styles.ticketCalled,
+            shadow.card,
+            { transform: [{ scale: calledScale }] },
+          ]}
+        >
+          <View style={styles.ticketTop}>
+            <View style={styles.ticketHeaderRow}>
+              <Text style={styles.ticketTitle}>QueueLess</Text>
+              <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+                <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.ticketLabel}>Token</Text>
+            <Text style={[styles.ticketNumber, isCalled && styles.ticketNumberCalled]}>#{token.number}</Text>
+            <Text style={styles.ticketSubtitle}>Show this at the counter</Text>
           </View>
-        </View>
+
+          <View style={styles.ticketDivider}>
+            <View style={styles.perfLine} />
+            <View style={styles.perfNotchLeft} />
+            <View style={styles.perfNotchRight} />
+          </View>
+
+          <View style={styles.ticketBottom}>
+            <View style={styles.ticketInfoRow}>
+              <View style={styles.ticketInfoBlock}>
+                <Text style={styles.ticketInfoLabel}>Position</Text>
+                <Text style={styles.ticketInfoValue}>{position > 0 ? position : '—'}</Text>
+              </View>
+              <View style={styles.ticketInfoBlock}>
+                <Text style={styles.ticketInfoLabel}>Est. Wait</Text>
+                <Text style={styles.ticketInfoValue}>
+                  {token.status === 'waiting' ? `${estimated_wait_minutes} min` : '—'}
+                </Text>
+              </View>
+              <View style={styles.ticketInfoBlock}>
+                <Text style={styles.ticketInfoLabel}>Type</Text>
+                <Text style={styles.ticketInfoValue}>{token.type?.toUpperCase?.() ?? 'APP'}</Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
 
         {/* Position info */}
         {isActive && (
@@ -158,18 +255,10 @@ export default function MyTokenScreen() {
 
             {token.status === 'waiting' && position > 0 && (
               <>
-                {/* Progress bar */}
                 <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${Math.max(5, 100 - position * 10)}%` }
-                    ]}
-                  />
+                  <View style={[styles.progressFill, { width: progressWidth }]} />
                 </View>
-                <Text style={styles.waitTime}>
-                  Est. wait: ~{estimated_wait_minutes} min
-                </Text>
+                <Text style={styles.waitTime}>Est. wait: ~{estimated_wait_minutes} min</Text>
               </>
             )}
 
@@ -184,7 +273,15 @@ export default function MyTokenScreen() {
         {/* Live indicator */}
         {isActive && (
           <View style={styles.liveRow}>
-            <View style={styles.liveDot} />
+            <View style={styles.liveDotWrap}>
+              <Animated.View
+                style={[
+                  styles.livePulse,
+                  { opacity: pulseOpacity, transform: [{ scale: pulseScale }] },
+                ]}
+              />
+              <View style={styles.liveDot} />
+            </View>
             <Text style={styles.liveText}>Live — updates automatically</Text>
           </View>
         )}
@@ -231,24 +328,105 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     backgroundColor: colors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     padding: spacing.lg,
     gap: spacing.md,
   },
-  tokenCard: {
+  ticket: {
     backgroundColor: colors.white,
     borderRadius: radius.lg,
-    padding: spacing.xl,
-    alignItems: 'center',
-    gap: spacing.sm,
+    overflow: 'hidden',
   },
-  tokenCardGreen: { backgroundColor: colors.greenBg },
-  tokenLabel: { fontSize: font.sm, color: colors.textSecondary, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
-  tokenNumber: { fontSize: 72, fontWeight: '800', color: colors.primary, lineHeight: 80 },
-  tokenNumberGreen: { color: colors.green },
-  statusBadge: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: radius.full },
-  statusText: { fontSize: font.sm, fontWeight: '700' },
+  ticketCalled: {
+    backgroundColor: colors.greenBg,
+  },
+  ticketTop: {
+    padding: spacing.lg,
+    gap: 6,
+  },
+  ticketHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  ticketTitle: {
+    fontSize: font.base,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  ticketLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginTop: spacing.sm,
+  },
+  ticketNumber: {
+    fontSize: 64,
+    fontWeight: '800',
+    color: colors.primary,
+    lineHeight: 70,
+  },
+  ticketNumberCalled: { color: colors.green },
+  ticketSubtitle: {
+    fontSize: font.sm,
+    color: colors.textSecondary,
+  },
+  ticketDivider: {
+    height: 24,
+    justifyContent: 'center',
+  },
+  perfLine: {
+    height: 1,
+    marginHorizontal: spacing.lg,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  perfNotchLeft: {
+    position: 'absolute',
+    left: -12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.background,
+  },
+  perfNotchRight: {
+    position: 'absolute',
+    right: -12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.background,
+  },
+  ticketBottom: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
+  ticketInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  ticketInfoBlock: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  ticketInfoLabel: {
+    fontSize: 11,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  ticketInfoValue: {
+    fontSize: font.base,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: 2,
+  },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.full },
+  statusText: { fontSize: 12, fontWeight: '700' },
   positionCard: {
     backgroundColor: colors.white,
     borderRadius: radius.md,
@@ -267,7 +445,15 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: radius.full },
   waitTime: { fontSize: font.sm, color: colors.textSecondary, fontWeight: '500' },
   pleaseReport: { fontSize: font.base, color: colors.green, fontWeight: '600', textAlign: 'center' },
-  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
+  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' },
+  liveDotWrap: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
+  livePulse: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.green,
+  },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.green },
   liveText: { fontSize: 12, color: colors.textSecondary },
   cancelBtn: {

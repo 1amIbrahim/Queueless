@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
 export default function Login() {
-  const { signIn, session, loading, error, clearError } = useAuthStore()
+  const { signIn, session, userRole, loading, error, clearError } = useAuthStore()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
-  useEffect(() => { if (session) navigate('/issue', { replace: true }) }, [session])
+  useEffect(() => {
+    if (!session) return
+    if (userRole === 'admin') navigate('/admin/overview', { replace: true })
+    else navigate('/issue', { replace: true })
+  }, [session, userRole])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -80,6 +84,16 @@ export default function Login() {
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
+
+          <div className="mt-6 pt-6 border-t border-slate-100 text-center">
+            <p className="text-xs text-slate-400 mb-2">New staff member?</p>
+            <Link
+              to="/staff-register"
+              className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+            >
+              Create a staff account →
+            </Link>
+          </div>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  ActivityIndicator, RefreshControl, SafeAreaView,
+  RefreshControl, SafeAreaView,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import * as Location from 'expo-location'
@@ -10,6 +10,7 @@ import { HospitalWithWait, Specialty } from '@queueless/shared'
 import { apiGet } from '../../lib/api'
 import HospitalCard from '../../components/HospitalCard'
 import SpecialtyPicker from '../../components/SpecialtyPicker'
+import SkeletonCard from '../../components/SkeletonCard'
 import { colors, spacing, font } from '../../constants/theme'
 
 type Tab = 'nearby' | 'specialty'
@@ -141,9 +142,9 @@ export default function ComparisonScreen() {
 
       {/* Body */}
       {loading ? (
-        <View style={styles.loadingState}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Finding hospitals near you…</Text>
+        <View style={styles.list}>
+          <Text style={styles.sectionLabel}>Finding hospitals near you…</Text>
+          {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
         </View>
       ) : error ? (
         <View style={styles.emptyState}>

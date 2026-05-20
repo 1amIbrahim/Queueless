@@ -36,6 +36,17 @@ export default function DoctorCard({ doctor, onJoin, joining }: Props) {
         <View style={styles.info}>
           <Text style={styles.name}>{doctor.name}</Text>
           <Text style={styles.specialty}>{specialtyLabel(doctor.specialty)}</Text>
+          <View style={styles.chipRow}>
+            <View style={[styles.chip, isOpen ? styles.chipOpen : styles.chipClosed]}>
+              <Text style={[styles.chipText, isOpen ? styles.chipTextOpen : styles.chipTextClosed]}>
+                {isOpen ? 'Open' : 'Closed'}
+              </Text>
+            </View>
+            <View style={styles.chipLight}>
+              <Ionicons name="time" size={12} color={colors.textSecondary} />
+              <Text style={styles.chipLightText}>{doctor.estimated_wait_minutes} min</Text>
+            </View>
+          </View>
         </View>
         <WaitTimeBadge
           minutes={doctor.estimated_wait_minutes}
@@ -77,7 +88,7 @@ export default function DoctorCard({ doctor, onJoin, joining }: Props) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     padding: spacing.md,
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
@@ -85,8 +96,8 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   avatar: {
-    width: 44, height: 44,
-    borderRadius: 22,
+    width: 48, height: 48,
+    borderRadius: 16,
     backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
@@ -95,6 +106,23 @@ const styles = StyleSheet.create({
   info: { flex: 1 },
   name: { fontSize: font.base, fontWeight: '700', color: colors.text },
   specialty: { fontSize: font.sm, color: colors.textSecondary, marginTop: 1 },
+  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
+  chipOpen: { backgroundColor: colors.greenBg },
+  chipClosed: { backgroundColor: colors.grayBg },
+  chipText: { fontSize: 11, fontWeight: '700' },
+  chipTextOpen: { color: colors.green },
+  chipTextClosed: { color: colors.textMuted },
+  chipLight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.background,
+  },
+  chipLightText: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -109,7 +137,7 @@ const styles = StyleSheet.create({
   joinBtn: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: radius.full,
     minWidth: 100,
     alignItems: 'center',

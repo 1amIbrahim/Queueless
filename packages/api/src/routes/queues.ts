@@ -9,12 +9,17 @@ const router = Router()
 router.get('/:id', requireAuth, async (req, res) => {
   const { data: queue, error } = await supabase
     .from('queues')
-    .select(`*, doctors(name, specialty)`)
+    .select(`*, doctors(name, specialty, hospital_id)`)
     .eq('id', req.params.id)
     .single()
 
   if (error || !queue) {
     res.status(404).json({ error: 'Queue not found' })
+    return
+  }
+
+  if ((req.userRole === 'receptionist' || req.userRole === 'doctor') && req.userHospitalId && (queue as any)?.doctors?.hospital_id !== req.userHospitalId) {
+    res.status(403).json({ error: 'Access restricted to your hospital' })
     return
   }
 
@@ -41,6 +46,18 @@ router.patch('/:id', requireAuth, requireRole('admin', 'receptionist'), async (r
     return
   }
 
+  if (req.userRole === 'receptionist' && req.userHospitalId) {
+    const { data: queue } = await supabase
+      .from('queues')
+      .select('id, doctors!inner(hospital_id)')
+      .eq('id', req.params.id)
+      .single()
+    if ((queue as any)?.doctors?.hospital_id !== req.userHospitalId) {
+      res.status(403).json({ error: 'Access restricted to your hospital' })
+      return
+    }
+  }
+
   const { data, error } = await supabase
     .from('queues')
     .update(parsed.data)
@@ -61,6 +78,27 @@ router.post('/', requireAuth, requireRole('admin', 'receptionist', 'doctor'), as
   const { doctor_id } = req.body
   if (!doctor_id) {
     res.status(400).json({ error: 'doctor_id required' })
+    return
+  }
+
+  const { data: doctor } = await supabase
+    .from('doctors')
+    .select('id, user_id, hospital_id')
+    .eq('id', doctor_id)
+    .single()
+
+  if (!doctor) {
+    res.status(404).json({ error: 'Doctor not found' })
+    return
+  }
+
+  if (req.userRole === 'doctor' && doctor.user_id !== req.userId) {
+    res.status(403).json({ error: 'Doctors can only open their own queue' })
+    return
+  }
+
+  if (req.userRole === 'receptionist' && req.userHospitalId && doctor.hospital_id !== req.userHospitalId) {
+    res.status(403).json({ error: 'Access restricted to your hospital' })
     return
   }
 

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 export interface AuthRequest extends Request {
   userId?: string
   userRole?: string
+  userHospitalId?: string | null
   accessToken?: string
 }
 
@@ -21,7 +22,14 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   }
 
   req.userId = data.user.id
-  req.userRole = data.user.user_metadata?.role ?? 'patient'
+  const { data: profile } = await supabase
+    .from('users')
+    .select('role, hospital_id')
+    .eq('id', data.user.id)
+    .single()
+
+  req.userRole = profile?.role ?? data.user.user_metadata?.role ?? 'patient'
+  req.userHospitalId = profile?.hospital_id ?? data.user.user_metadata?.hospital_id ?? null
   req.accessToken = token
   next()
 }

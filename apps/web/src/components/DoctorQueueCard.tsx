@@ -35,18 +35,19 @@ export default function DoctorQueueCard({ queue, onCallNext, callingNext }: Prop
   const s = STATUS[queue.status as keyof typeof STATUS] ?? STATUS.closed
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 hover:border-blue-200 hover:shadow-sm transition-all">
-      <div className="flex justify-between items-start mb-4">
+    <div className="bg-white rounded-2xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-md transition-all">
+      <div className="flex justify-between items-start mb-5">
         <div>
-          <p className="font-semibold text-slate-900">{queue.doctors.name}</p>
-          <p className="text-sm text-slate-500 capitalize mt-0.5">{queue.doctors.specialty}</p>
+          <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Doctor</p>
+          <p className="font-semibold text-slate-900 text-lg mt-1">{queue.doctors.name}</p>
+          <p className="text-sm text-slate-500 capitalize mt-1">{queue.doctors.specialty}</p>
         </div>
-        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${s.cls}`}>
+        <span className={`text-xs font-semibold px-3 py-1 rounded-full ${s.cls}`}>
           {s.label}
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-3 gap-3 mb-5">
         <Stat
           label="Waiting"
           value={String(queue.queue_length)}
@@ -68,9 +69,9 @@ export default function DoctorQueueCard({ queue, onCallNext, callingNext }: Prop
         <button
           onClick={onCallNext}
           disabled={callingNext || queue.queue_length === 0}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg transition-colors"
+          className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
         >
-          {callingNext ? 'Calling…' : queue.queue_length === 0 ? 'Queue Empty' : 'Call Next Patient →'}
+          {callingNext ? 'Calling…' : queue.queue_length === 0 ? 'Queue Empty' : 'Call Next Patient'}
         </button>
       )}
     </div>
@@ -79,9 +80,9 @@ export default function DoctorQueueCard({ queue, onCallNext, callingNext }: Prop
 
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="bg-slate-50 rounded-lg p-3 text-center">
+    <div className="bg-slate-50 rounded-xl p-3 text-center">
       <p className={`text-lg font-bold ${color}`}>{value}</p>
-      <p className="text-xs text-slate-400 mt-0.5">{label}</p>
+      <p className="text-xs text-slate-400 mt-1 uppercase tracking-[0.2em]">{label}</p>
     </div>
   )
 }

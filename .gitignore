@@ -6,3 +6,6 @@ dist/
 .env.local
 .DS_Store
 *.log
+QueueLess_Presentation.pptx
+QueueLess_Proposal_v2.pdf
+~$QueueLess_Presentation.pptx

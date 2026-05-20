@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiGet, apiPatch } from '../lib/api'
+import { useAuthStore } from '../store/authStore'
 
 interface Hospital { id: string; name: string }
 interface Token {
@@ -19,6 +20,7 @@ const STATUS_STYLE: Record<string, string> = {
 const LAHORE = { lat: 31.52, lng: 74.36 }
 
 export default function QueueManagement() {
+  const { userRole, hospitalId } = useAuthStore()
   const [hospitals, setHospitals] = useState<Hospital[]>([])
   const [selectedHospital, setSelectedHospital] = useState('')
   const [tokens, setTokens] = useState<Token[]>([])
@@ -30,10 +32,16 @@ export default function QueueManagement() {
     apiGet<{ hospitals: Hospital[] }>(
       `/hospitals/nearby?lat=${LAHORE.lat}&lng=${LAHORE.lng}&radius_km=50`
     ).then(d => {
-      setHospitals(d.hospitals)
-      if (d.hospitals.length > 0) setSelectedHospital(d.hospitals[0].id)
+      if (userRole !== 'admin' && hospitalId) {
+        const own = d.hospitals.find(h => h.id === hospitalId)
+        setHospitals(own ? [own] : [])
+        if (own) setSelectedHospital(own.id)
+      } else {
+        setHospitals(d.hospitals)
+        if (d.hospitals.length > 0) setSelectedHospital(d.hospitals[0].id)
+      }
     }).catch(() => {})
-  }, [])
+  }, [hospitalId, userRole])
 
   const loadTokens = useCallback(async (hospitalId: string) => {
     if (!hospitalId) return
@@ -71,13 +79,19 @@ export default function QueueManagement() {
           <h1 className="text-2xl font-bold text-slate-900">Queue Management</h1>
           <p className="text-slate-500 text-sm mt-1">View and manage all tokens issued today</p>
         </div>
-        <select
-          value={selectedHospital}
-          onChange={e => setSelectedHospital(e.target.value)}
-          className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {hospitals.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-        </select>
+        {userRole === 'admin' ? (
+          <select
+            value={selectedHospital}
+            onChange={e => setSelectedHospital(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {hospitals.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+          </select>
+        ) : (
+          <div className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white text-slate-600">
+            {hospitals[0]?.name ?? 'Assigned hospital'}
+          </div>
+        )}
       </div>
 
       {/* Filter tabs */}

@@ -1,41 +1,51 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Slot, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useAuthStore } from '../store/authStore'
 
 export default function RootLayout() {
   const { session, userRole, initialized, init } = useAuthStore()
   const router = useRouter()
   const segments = useSegments()
-
-  useEffect(() => { init() }, [])
+  const [onboarded, setOnboarded] = useState<boolean | null>(null)
 
   useEffect(() => {
-    if (!initialized) return
+    init()
+    AsyncStorage.getItem('queueless_onboarded').then(v => setOnboarded(v === 'true'))
+  }, [])
 
-    const inAuthGroup   = segments[0] === '(auth)'
-    const inDoctorGroup = segments[0] === 'doctor'
-    const inTabsGroup   = segments[0] === '(tabs)'
+  useEffect(() => {
+    if (!initialized || onboarded === null) return
 
-    if (!session) {
-      if (!inAuthGroup) router.replace('/(auth)/login')
+    const inAuth    = segments[0] === '(auth)'
+    const inDoctor  = segments[0] === 'doctor'
+    const inTabs    = segments[0] === '(tabs)'
+
+    // New user — show onboarding before login
+    if (!session && !inAuth) {
+      if (!onboarded) {
+        router.replace('/(auth)/onboarding')
+      } else {
+        router.replace('/(auth)/login')
+      }
       return
     }
 
     // Logged in — route by role
-    if (inAuthGroup) {
+    if (session && inAuth) {
       if (userRole === 'doctor') router.replace('/doctor/queue')
       else router.replace('/(tabs)/')
       return
     }
 
-    // Prevent doctor from accessing patient tabs and vice versa
-    if (userRole === 'doctor' && (inTabsGroup)) {
+    // Guard: prevent role mismatch
+    if (session && userRole === 'doctor' && inTabs) {
       router.replace('/doctor/queue')
-    } else if (userRole !== 'doctor' && inDoctorGroup) {
+    } else if (session && userRole !== 'doctor' && inDoctor) {
       router.replace('/(tabs)/')
     }
-  }, [session, userRole, initialized, segments])
+  }, [session, userRole, initialized, onboarded, segments])
 
   return (
     <>

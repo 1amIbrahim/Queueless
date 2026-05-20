@@ -25,6 +25,18 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
 
   const { queue_id, patient_id, patient_name, patient_phone, type } = parsed.data
 
+  if (req.userRole === 'receptionist' && req.userHospitalId) {
+    const { data: queue } = await supabase
+      .from('queues')
+      .select('id, doctors!inner(hospital_id)')
+      .eq('id', queue_id)
+      .single()
+    if ((queue as any)?.doctors?.hospital_id !== req.userHospitalId) {
+      res.status(403).json({ error: 'Access restricted to your hospital' })
+      return
+    }
+  }
+
   // Use user-scoped client so auth.role() = 'authenticated' satisfies RLS
   const db = userSupabase(req.accessToken!)
 
@@ -162,6 +174,32 @@ router.post('/call-next', requireAuth, requireRole('doctor', 'receptionist', 'ad
   if (!queue_id) {
     res.status(400).json({ error: 'queue_id is required' })
     return
+  }
+
+  if ((req.userRole === 'receptionist' || req.userRole === 'doctor') && req.userHospitalId) {
+    const { data: queue } = await supabase
+      .from('queues')
+      .select('id, doctors!inner(hospital_id, user_id)')
+      .eq('id', queue_id)
+      .single()
+
+    if (!queue) {
+      res.status(404).json({ error: 'Queue not found' })
+      return
+    }
+
+    const doctorHospitalId = (queue as any)?.doctors?.hospital_id
+    const doctorUserId = (queue as any)?.doctors?.user_id
+
+    if (req.userRole === 'doctor' && doctorUserId && doctorUserId !== req.userId) {
+      res.status(403).json({ error: 'Doctors can only call from their own queue' })
+      return
+    }
+
+    if (req.userRole === 'receptionist' && doctorHospitalId !== req.userHospitalId) {
+      res.status(403).json({ error: 'Access restricted to your hospital' })
+      return
+    }
   }
 
   const db = userSupabase(req.accessToken!)

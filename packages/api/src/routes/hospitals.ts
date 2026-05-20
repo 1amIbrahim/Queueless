@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { supabase } from '../lib/supabase'
+import { requireAuth, AuthRequest } from '../middleware/auth'
 import { haversineKm } from '../lib/distance'
 import { HospitalWithWait, Specialty } from '@queueless/shared'
 
@@ -83,7 +84,11 @@ router.get('/nearby', async (req, res) => {
 })
 
 // GET /hospitals/:id/queues
-router.get('/:id/queues', async (req, res) => {
+router.get('/:id/queues', requireAuth, async (req: AuthRequest, res) => {
+  if ((req.userRole === 'receptionist' || req.userRole === 'doctor') && req.userHospitalId && req.userHospitalId !== req.params.id) {
+    res.status(403).json({ error: 'Access restricted to your hospital' })
+    return
+  }
   const today = new Date().toISOString().split('T')[0]
 
   // Fetch doctor IDs belonging to this hospital first, then query queues by doctor_id.
